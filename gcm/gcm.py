@@ -119,9 +119,8 @@ class GCM(object):
             self.proxy = proxy
 
 
-    def construct_payload(self, registration_ids, data=None, collapse_key=None,
-        delay_while_idle=False, time_to_live=None, is_json=True, dry_run=False,
-        restricted_package_name=None):
+    def construct_payload(self, registration_ids, data=None, notification=None, collapse_key=None,
+        delay_while_idle=False, time_to_live=None, is_json=True, dry_run=False):
         """
         Construct the dictionary mapping of parameters.
         Encodes the dictionary into JSON if for json requests.
@@ -138,13 +137,17 @@ class GCM(object):
         payload = {}
         if is_json:
             payload['registration_ids'] = registration_ids
-            if data:
+            if data is not None:
                 payload['data'] = data
+            if notification is not None:
+                payload['notification'] = notification
         else:
             payload['registration_id'] = registration_ids
             if data:
                 for key, value in data.items():
                     payload['data.%s' % key] = value
+            if notification is not None:
+                raise GCMMalformedJsonException("Must use a JSON-encoded request for requests with a notification field")
 
         if delay_while_idle:
             payload['delay_while_idle'] = delay_while_idle
@@ -166,11 +169,11 @@ class GCM(object):
 
         return payload
 
-    def make_request(self, data, is_json=True):
+    def make_request(self, payload, is_json=True):
         """
         Makes a HTTP request to GCM servers with the constructed payload
 
-        :param data: return value from construct_payload method
+        :param payload: return value from construct_payload method
         :raises GCMMalformedJsonException: if malformed JSON request found
         :raises GCMAuthenticationException: if there was a problem with authentication, invalid api key
         :raises GCMConnectionException: if GCM is screwed
@@ -185,10 +188,10 @@ class GCM(object):
             headers['Content-Type'] = 'application/json'
 
         if not is_json:
-            data = urlencode_utf8(data)
+            payload = urlencode_utf8(payload)
 
         response = requests.post(
-            self.url, data=data, headers=headers,
+            self.url, data=payload, headers=self.headers,
             proxies=self.proxy
         )
         # Successful response
@@ -300,7 +303,7 @@ class GCM(object):
 
         raise IOError("Could not make request after %d attempts" % attempt)
 
-    def json_request(self, registration_ids, data=None, collapse_key=None,
+    def json_request(self, registration_ids, data=None, notification=None, collapse_key=None,
                      delay_while_idle=False, time_to_live=None, retries=5,
                      dry_run=False, restricted_package_name=None):
         """
@@ -322,6 +325,7 @@ class GCM(object):
         payload = self.construct_payload(
             registration_ids,
             data=data,
+            notification=noticiation,
             collapse_key=collapse_key,
             delay_while_idle=delay_while_idle,
             time_to_live=time_to_live,
@@ -332,7 +336,6 @@ class GCM(object):
 
         backoff = self.BACKOFF_INITIAL_DELAY
         for attempt in range(retries):
-
             response = self.make_request(payload, is_json=True)
             info = self.handle_json_response(response, registration_ids)
 
