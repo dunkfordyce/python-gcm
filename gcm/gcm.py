@@ -120,7 +120,7 @@ class GCM(object):
 
 
     def construct_payload(self, registration_ids, data=None, notification=None, collapse_key=None,
-        delay_while_idle=False, time_to_live=None, is_json=True, dry_run=False):
+        delay_while_idle=False, time_to_live=None, is_json=True, dry_run=False, restricted_package_name=None):
         """
         Construct the dictionary mapping of parameters.
         Encodes the dictionary into JSON if for json requests.
@@ -191,8 +191,9 @@ class GCM(object):
             payload = urlencode_utf8(payload)
 
         response = requests.post(
-            self.url, data=payload, headers=self.headers,
-            proxies=self.proxy
+            self.url, data=payload, headers=headers,
+            proxies=self.proxy,
+            verify=False
         )
         # Successful response
         if response.status_code == 200:
@@ -325,7 +326,7 @@ class GCM(object):
         payload = self.construct_payload(
             registration_ids,
             data=data,
-            notification=noticiation,
+            notification=notification,
             collapse_key=collapse_key,
             delay_while_idle=delay_while_idle,
             time_to_live=time_to_live,
